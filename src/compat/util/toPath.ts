@@ -1,3 +1,6 @@
+const CACHE_LIMIT = 500;
+const CACHE = /* #__PURE__ */ new Map<string, string[]>();
+
 /**
  * Converts a deep key string into an array of path segments.
  *
@@ -16,6 +19,10 @@
  * toPath('.a[b].c.d[e]["f.g"].h') // Returns ['', 'a', 'b', 'c', 'd', 'e', 'f.g', 'h']
  */
 export function toPath(deepKey: string): string[] {
+  if (CACHE.has(deepKey)) {
+    return CACHE.get(deepKey)!;
+  }
+
   const result: string[] = [];
   const length = deepKey.length;
 
@@ -28,8 +35,9 @@ export function toPath(deepKey: string): string[] {
   let quoteChar = '';
   let bracket = false;
 
-  // Leading dot
+  // Handle leading dot
   if (deepKey.charCodeAt(0) === 46) {
+    // 46 is '.'
     result.push('');
     index++;
   }
@@ -39,21 +47,17 @@ export function toPath(deepKey: string): string[] {
 
     if (quoteChar) {
       if (char === '\\' && index + 1 < length) {
-        // Escape character
         index++;
         key += deepKey[index];
       } else if (char === quoteChar) {
-        // End of quote
         quoteChar = '';
       } else {
         key += char;
       }
     } else if (bracket) {
       if (char === '"' || char === "'") {
-        // Start of quoted string inside brackets
         quoteChar = char;
       } else if (char === ']') {
-        // End of bracketed segment
         bracket = false;
         result.push(key);
         key = '';
@@ -62,7 +66,6 @@ export function toPath(deepKey: string): string[] {
       }
     } else {
       if (char === '[') {
-        // Start of bracketed segment
         bracket = true;
         if (key) {
           result.push(key);
@@ -83,6 +86,12 @@ export function toPath(deepKey: string): string[] {
 
   if (key) {
     result.push(key);
+  }
+
+  CACHE.set(deepKey, result);
+
+  if (CACHE.size > CACHE_LIMIT) {
+    CACHE.clear();
   }
 
   return result;
